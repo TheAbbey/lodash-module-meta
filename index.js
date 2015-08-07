@@ -3,11 +3,11 @@ var vm = require('vm');
 var Promise = require('bluebird');
 var request = require('request-promise');
 var util = require('lodash-cli/lib/util');
+var fs = require('fs');
 
 function makeSandbox() {
   return vm.createContext({
     require: function(file) {
-      console.log(file);
       if (/lodash/.test(file)) return lodash;
       else if (/util/.test(file)) return util;
     },
@@ -31,6 +31,7 @@ request({
     .then(function(file) {
       var sandbox = makeSandbox();
       vm.runInContext(String(file), sandbox);
+      sandbox.module.exports.tag = tag.name;
       return sandbox.module.exports;
     }, function() {
       return null;
@@ -39,8 +40,9 @@ request({
   .then(function(modules) {
     modules = lodash.filter(modules);
 
-    lodash.each(modules, function(module) {
-      console.log(lodash.keys(module));
+    var result = lodash.transform(modules, function(memo, module) {
+      memo[module.tag] = lodash.pick(module, 'aliasToReal', 'category');
     });
+    fs.writeFileSync('database.json', JSON.stringify(lodash.toPlainObject(result), null, "\t"));
   });;
 });
